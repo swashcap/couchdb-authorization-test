@@ -40,9 +40,17 @@ var docs = [{
   title: 'Mother Jones',
   url: 'http://www.motherjones.com/'
 }]
-var user = {
+var user1 = {
   password: 'bananas',
   username: 'fruits'
+}
+var user2 = {
+  password: 'cucumbers',
+  username: 'vegetables'
+}
+
+function getUserURL (username) {
+  return HOST + '/_users/org.couchdb.user:' + username
 }
 
 /**
@@ -67,7 +75,7 @@ axios.put(HOST + '/_config/admins/' + admin.username, '"' + admin.password + '"'
       { auth: admin }
     )
   })
-  .then(function createUser (response) {
+  .then(function createUsers (response) {
     // Make sure `_bulk_docs` didn't result in an error:
     response.data.forEach(function (item) {
       if (item.error) {
@@ -76,24 +84,32 @@ axios.put(HOST + '/_config/admins/' + admin.username, '"' + admin.password + '"'
     })
 
     /**
-     * Create the regular (non-admin) user. This requires some basic fields.
+     * Create the regular (non-admin) users. This requires some basic fields.
      *
      * {@link http://docs.couchdb.org/en/1.6.1/intro/security.html#creating-new-user}
      */
-    return axios.put(HOST + '/_users/org.couchdb.user:' + user.username, {
-      name: user.username,
-      password: user.password,
-      roles: [],
-      type: 'user'
-    })
+    return axios.all([
+      axios.put(getUserURL(user1.username), {
+        name: user1.username,
+        password: user1.password,
+        roles: [],
+        type: 'user'
+      }),
+      axios.put(getUserURL(user2.username), {
+        name: user2.username,
+        password: user2.password,
+        roles: [],
+        type: 'user'
+      })
+    ])
   })
-  .then(function getUser (response) {
+  .then(axios.spread(function getUser (response) {
     /**
-     * Only database admins can modify users' roles. Retrieve the user's
+     * Only database admins can modify users' roles. Retrieve user1's
      * document to modify it.
      */
-    return axios.get(HOST + '/_users/' + response.data.id, { auth: user })
-  })
+    return axios.get(HOST + '/_users/' + response.data.id, { auth: user1 })
+  }))
   .then(function addRoleToUser (response) {
     var user = response.data
 
@@ -125,26 +141,43 @@ axios.put(HOST + '/_config/admins/' + admin.username, '"' + admin.password + '"'
       { auth: admin }
     )
   })
-  .then(function getDocument () {
+  .then(function getUnauthorizedDocument () {
+    // Try to get a document as a user without the test role
+    return axios.get(HOST + '/' + DB + '/' + docs[0]._id, { auth: user2 })
+  })
+  .catch(function getUnauthorizedDocumentError (error) {
+    // Make sure the error matches the unauthorized request
+    if (
+      error.response &&
+      error.response.status === 401 &&
+      error.response.config.url === HOST + '/' + DB + '/' + docs[0]._id
+    ) {
+      console.log('✔ Can\'t retrieve document when unauthorized')
+    } else {
+      throw error
+    }
+  })
+  .then(function getAuthorizedDocument () {
     // Try to get a document as a user
-    return axios.get(HOST + '/' + DB + '/' + docs[0]._id, { auth: user })
+    return axios.get(HOST + '/' + DB + '/' + docs[0]._id, { auth: user1 })
   })
   .then(function modifyDocument (response) {
     var doc = response.data
 
-    console.log('Retrieved a document!')
+    console.log('✔ Retrieved a document!')
 
     doc.twitter = '@NewYorker'
 
-    return axios.put(HOST + '/' + DB + '/' + doc._id, doc, { auth: user })
+    // Try to modify the document
+    return axios.put(HOST + '/' + DB + '/' + doc._id, doc, { auth: user1 })
   })
   .catch(console.error)
   .then(function teardown () {
-    console.log('Modified a document!')
+    console.log('✔ Modified a document!')
 
     /**
      * Tear down the test setup. First remove the admin, then the database and
-     * user.
+     * users.
      */
     return axios.delete(
       HOST + '/_config/admins/' + admin.username,
@@ -152,15 +185,20 @@ axios.put(HOST + '/_config/admins/' + admin.username, '"' + admin.password + '"'
     )
       .then(function teardownData () {
         return axios.all([
-          axios.get(HOST + '/_users/org.couchdb.user:' + user.username),
+          axios.get(getUserURL(user1.username)),
+          axios.get(getUserURL(user2.username)),
           axios.delete(HOST + '/' + DB)
         ])
       })
-      .then(axios.spread(function teardownUser (response) {
-        var rev = response.data._rev
-        return axios.delete(
-          HOST + '/_users/org.couchdb.user:' + user.username + '?rev=' + rev
-        )
+      .then(axios.spread(function teardownUser (response1, response2) {
+        return axios.all([
+          axios.delete(
+            getUserURL(user1.username) + '?rev=' + response1.data._rev
+          ),
+          axios.delete(
+            getUserURL(user2.username) + '?rev=' + response2.data._rev
+          )
+        ])
       }))
   })
   .catch(console.error)
