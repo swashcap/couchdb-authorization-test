@@ -2,9 +2,9 @@
   "name": "couchdb-authorization-test",
   "version": "1.0.0",
   "description": "Test CouchDB’s “roles” authorization.",
-  "main": "index.js",
+  "main": "test.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "standard && node test.js"
   },
   "repository": {
     "type": "git",
@@ -17,5 +17,9 @@
     "url": "https://github.com/swashcap/couchdb-authorization-test/issues"
   },
   "homepage": "https://github.com/swashcap/couchdb-authorization-test#readme",
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "axios": "^0.15.3",
+    "standard": "^8.6.0"
+  }
 }
