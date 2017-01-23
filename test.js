@@ -47,7 +47,8 @@ var user = {
 
 /**
  * Create a new admin.
- * {@link http://docs.couchdb.org/en/2.0.0/intro/security.html#creating-new-admin-user}
+ *
+ * {@link http://docs.couchdb.org/en/1.6.1/intro/security.html#creating-new-admin-user}
  */
 axios.put(HOST + '/_config/admins/' + admin.username, '"' + admin.password + '"')
   .then(function createDatabase () {
