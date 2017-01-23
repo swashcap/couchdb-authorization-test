@@ -29,8 +29,8 @@ CouchDB appears to automatically authorize users. So, if your database's securit
 
 ```json
 {
-  "name": "fruits"
-  "password": "bananas"
+  "name": "fruits",
+  "password": "bananas",
   "roles": ["testrole"],
   "type": "user"
 }
